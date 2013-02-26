@@ -48,6 +48,7 @@ static const _openslide_tiff_vendor_fn tiff_formats[] = {
   _openslide_try_trestle,
   _openslide_try_aperio,
   _openslide_try_leica,
+  _openslide_try_ventana,
   _openslide_try_generic_tiff,
   NULL
 };
