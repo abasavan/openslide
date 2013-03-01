@@ -42,6 +42,7 @@
 #include <libxml/xpathInternals.h>
 
 static const char *VENTANA_ISCAN = "/EncodeInfo/SlideInfo/iScan";
+static const char *VENTANA_OVERLAP = "/EncodeInfo/SlideStitchInfo/ImageInfo[1]/TileJointInfo[@FlagJoined=1]";
 
 struct level {
   int32_t directory;
@@ -65,14 +66,14 @@ static bool find_property(const char *string_to_parse, const char *prop_name, ch
   bool status = false;
   GRegex *props_regex;
   GMatchInfo *props_match;
+  char *pattern;
 
   if(quotes) {
-    const char *pattern = g_strdup_printf("%s=[\"\'](.*)[\"\']",prop_name);
-    props_regex = g_regex_new(pattern, G_REGEX_OPTIMIZE | G_REGEX_UNGREEDY, 0, NULL); // pass err if desired, ignoring for now
+    pattern = g_strdup_printf("%s=[\'](.*)[\']",prop_name);
   } else {
-    const char *pattern = g_strdup_printf("%s=(\\S+)",prop_name);
-    props_regex = g_regex_new(pattern, G_REGEX_OPTIMIZE | G_REGEX_UNGREEDY, 0, NULL); // pass err if desired, ignoring for now
+    pattern = g_strdup_printf("%s=(\\S+)",prop_name);
   }
+  props_regex = g_regex_new((const char *) pattern, G_REGEX_OPTIMIZE | G_REGEX_UNGREEDY, 0, NULL); // pass err if desired, ignoring for now
 
   if(!g_regex_match((const GRegex *)props_regex, string_to_parse, 0, &props_match)) {
 //    _openslide_set_error(osr, "No properties found");
@@ -175,7 +176,7 @@ static bool parse_xml_description(const char *xml, openslide_t *osr, GError **er
 /* 
 ANB: goals of this function are different from the corresponding leica function (from which this is derived)
 1) Image properties are saved in attribues of element 'EncodeInfo/SlideInfo/iScan'
-2) Overlap info in 'EncodeInfo/SlideStitchInfo/
+2) Overlap info in '/EncodeInfo/SlideStitchInfo/ImageInfo/TileJointInfo'
 */
   xmlDocPtr doc = NULL;
   xmlNode *iScan;
