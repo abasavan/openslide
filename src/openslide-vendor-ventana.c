@@ -41,8 +41,9 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 
-static const char *VENTANA_ISCAN = "/EncodeInfo/SlideInfo/iScan";
-static const char *VENTANA_OVERLAP = "/EncodeInfo/SlideStitchInfo/ImageInfo[1]/TileJointInfo[@FlagJoined=1]";
+//static const char *VENTANA_ISCAN = "/EncodeInfo/SlideInfo/iScan";
+static const char *VENTANA_ISCAN = "/iScan";
+//static const char *VENTANA_OVERLAP = "/EncodeInfo/SlideStitchInfo/ImageInfo[1]/TileJointInfo[@FlagJoined=1]";
 
 struct level {
   int32_t directory;
@@ -69,7 +70,7 @@ static bool find_property(const char *string_to_parse, const char *prop_name, ch
   char *pattern;
 
   if(quotes) {
-    pattern = g_strdup_printf("%s=[\'](.*)[\']",prop_name);
+    pattern = g_strdup_printf("%s=[\"](.*)[\"]",prop_name);
   } else {
     pattern = g_strdup_printf("%s=(\\S+)",prop_name);
   }
@@ -211,7 +212,7 @@ ANB: goals of this function are different from the corresponding leica function 
         ServerDirectory
 	LabelImage
 	iScan
-	  AOIO
+	  AOI0
         ...
   */
 
@@ -227,7 +228,7 @@ ANB: goals of this function are different from the corresponding leica function 
   xmlXPathFreeObject(result);
   result = NULL;
 
-  // pull important (i.e. required) properties whose absense would lead to hard failure
+  // pull important (i.e. required) properties whose absence would lead to hard failure
   // TODO: fail with ERROR_BAD_DATA if these aren't set
   // read magnification
   set_prop_from_attribute(osr, "ventana.magnification", VENTANA_ISCAN, "Magnification", context);
@@ -348,6 +349,25 @@ NOTE: The following info is drawn from a single slide
         g_prefix_error(err, "Can't read associated label image: ");
         goto FAIL;
       } else {
+
+        // parse XMP data here (because TIF files contain XMP data in the label image)
+        char *xmpData;
+        uint32_t *xmpData_size; 
+
+        bool status = TIFFGetField(tiff,TIFFTAG_XMLPACKET, &xmpData_size, &xmpData);
+
+        // check if it containes iScan node before we invoke the parser
+        if (!status || (strstr((const char *) xmpData, "<iScan") == NULL)) {
+          g_set_error(err, OPENSLIDE_ERROR, OPENSLIDE_ERROR_FORMAT_NOT_SUPPORTED,
+                      "Not a Ventana slide");
+          goto FAIL;
+        }
+
+        if (!parse_xml_description(xmpData, osr, err)) {
+          // unrecognizable xml
+          goto FAIL;
+        }
+
         continue; // don't add it to tiled (pyramidal) levels
       }
     }
@@ -388,7 +408,7 @@ NOTE: The following info is drawn from a single slide
     }
 
     // use this opportunity to parse xmp data at level=0 (hard fail if it doesn't exist)
-    char *xmpData;
+/*    char *xmpData;
     uint32_t *xmpData_size; 
     if(strcmp(level_value,"0") == 0) {
 
@@ -405,7 +425,7 @@ NOTE: The following info is drawn from a single slide
         // unrecognizable xml
         goto FAIL;
       }
-    }
+    } */
 
     // push into list
     struct level *l = g_slice_new(struct level);
